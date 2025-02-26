@@ -19,7 +19,7 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = {"prompt": prompt, "width": 512, "height": 512}
     
     try:
-        response = requests.post("https://api.flux.ai/v1/generate", json=data, headers=headers)
+        response = requests.post("https://api.gen-api.ru/api/v1/networks/flux", json=data, headers=headers)
         response.raise_for_status()
         image_url = response.json()["url"]
 
