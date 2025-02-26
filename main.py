@@ -1,13 +1,14 @@
 import os
 import requests
-import asyncio
+import time
 import io
+import json
 from telegram import Update, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Конфигурация
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Токен Telegram-бота
-FLUX_API_KEY = os.getenv("FLUX_API_KEY")      # API-ключ Flux
+FLUX_API_KEY = os.getenv("FLUX_API_KEY")      # API-ключ Flux.ai
 
 # URL API
 API_URL = "https://api.gen-api.ru/api/v1/networks/flux"
@@ -21,7 +22,7 @@ HEADERS = {
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start."""
-    await update.message.reply_text("Пришлите промт текстом.")
+    await update.message.reply_text("Пришлите промт текстом")
 
 async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик генерации изображения."""
@@ -31,9 +32,9 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     input_data = {
         "translate_input": True,
         "prompt": prompt,
-        "model": "ultra",
-        "width": "2048",
-        "height": "2048",
+        "model": "Schnell",
+        "width": "560",
+        "height": "560",
         "num_inference_steps": 28,
         "guidance_scale": 5,
         "num_images": 1,
@@ -49,7 +50,7 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_data = response.json()
 
         # Логируем ответ API
-        print("Ответ API на запрос генерации:", task_data)
+        print("Ответ API (старт задачи):", json.dumps(task_data, indent=4, ensure_ascii=False))
 
         # Получение request_id
         request_id = task_data.get("request_id")
@@ -59,15 +60,15 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Ожидание завершения задачи
         await update.message.reply_text("Генерация изображения началась. Ожидайте...")
         result_url = f"https://api.gen-api.ru/api/v1/request/get/{request_id}"
-
-        for _ in range(10):  # Максимум 10 попыток (200 секунд)
-            await asyncio.sleep(20)  # Ожидание 20 секунд перед проверкой статуса
+        
+        while True:
+            time.sleep(10)  # Ожидание перед проверкой статуса
             result_response = requests.get(result_url, headers=HEADERS)
             result_response.raise_for_status()
             result_data = result_response.json()
 
-            # Логируем ответ API
-            print("Ответ API на проверку статуса:", result_data)
+            # Логируем ответ API (получение результата)
+            print("Ответ API (результат задачи):", json.dumps(result_data, indent=4, ensure_ascii=False))
 
             if result_data.get("status") == "success":
                 output = result_data.get("output")
@@ -76,9 +77,6 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
             elif result_data.get("status") == "failed":
                 raise ValueError("Ошибка генерации изображения")
-
-        else:
-            raise ValueError("Время ожидания истекло. Попробуйте позже.")
 
         # Скачивание изображения
         image_data = requests.get(output).content
