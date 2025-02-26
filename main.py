@@ -8,6 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # Конфигурация
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 FLUX_API_KEY = os.getenv("FLUX_API_KEY")
+API_URL = "https://api.gen-api.ru/api/v1/networks/flux"
 
 HEADERS = {
     "Content-Type": "application/json",
