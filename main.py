@@ -1,6 +1,5 @@
 import os
 import io
-import json
 import requests
 import asyncio
 from telegram import Update, InputFile
@@ -9,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # Конфигурация
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 FLUX_API_KEY = os.getenv("FLUX_API_KEY")
-API_URL = "https://api.gen-api.ru/api/v1/networks/flux"  # Эндпоинт для создания задачи
+API_URL = "https://api.gen-api.ru/api/v1/networks/flux"
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -17,103 +16,60 @@ HEADERS = {
     "Authorization": f"Bearer {FLUX_API_KEY}"
 }
 
-# Модель и параметры по умолчанию
-DEFAULT_MODEL = "Realism"  # Модель для генерации изображений
-DEFAULT_WIDTH = 1280  # Ширина изображения
-DEFAULT_HEIGHT = 1280  # Высота изображения
-DEFAULT_NUM_IMAGES = 1  # Количество изображений
-DEFAULT_NUM_INFERENCE_STEPS = 28  # Количество шагов генерации
-DEFAULT_GUIDANCE_SCALE = 5  # Параметр guidance_scale
-DEFAULT_STRENGTH = 1  # Параметр strength
-DEFAULT_SAFETY_CHECKER = False  # Отключение проверки безопасности
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start."""
-    await update.message.reply_text(
-        "Привет! Отправьте текстовый промт для генерации изображения. "
-        "Например: 'Портрет женщины в стиле бохо с зелеными глазами.'"
-    )
+    await update.message.reply_text("Привет! Отправь промт для генерации изображения.")
 
 async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик текстовых сообщений для генерации изображения."""
     prompt = update.message.text.strip()
     if not prompt:
-        await update.message.reply_text("Пожалуйста, введите промт.")
+        await update.message.reply_text("Введите промт.")
         return
 
-    # Формируем тело запроса
+    # Тело запроса как в документации
     input_data = {
-        "translate_input": True,  # Автоматический перевод промта
-        "prompt": prompt,
-        "model": DEFAULT_MODEL,
-        "width": DEFAULT_WIDTH,
-        "height": DEFAULT_HEIGHT,
-        "num_inference_steps": DEFAULT_NUM_INFERENCE_STEPS,
-        "guidance_scale": DEFAULT_GUIDANCE_SCALE,
-        "num_images": DEFAULT_NUM_IMAGES,
-        "enable_safety_checker": DEFAULT_SAFETY_CHECKER,
-        "strength": DEFAULT_STRENGTH,
-        "is_sync": False  # Асинхронный режим
+        "callback_url": None,
+        "prompt": prompt
     }
 
     try:
-        # Отправка запроса на создание задачи
+        # 1. Создаем задачу
         response = requests.post(API_URL, json=input_data, headers=HEADERS)
-        response.raise_for_status()  # Проверяем статус ответа
+        response.raise_for_status()
         task_data = response.json()
-        print("Ответ API (создание задачи):", json.dumps(task_data, indent=4, ensure_ascii=False))
+        print("Создана задача:", task_data)
 
-        # Получаем request_id из ответа
-        request_id = task_data.get("request_id")
-        if not request_id:
-            await update.message.reply_text("Ошибка: не удалось получить request_id.")
-            return
+        request_id = task_data["request_id"]
+        await update.message.reply_text("Генерация началась. Ожидайте...")
 
-        await update.message.reply_text("Генерация изображения началась. Ожидайте...")
-
-        # Ожидание завершения задачи
+        # 2. Проверяем статус
         result_url = f"https://api.gen-api.ru/api/v1/requests/{request_id}"
         image_url = None
-
-        # Проверяем статус задачи несколько раз с интервалом
-        for attempt in range(10):  # 10 попыток с интервалом 15 секунд
+        
+        for _ in range(10):  # 10 попыток
             await asyncio.sleep(15)
             result_response = requests.get(result_url, headers=HEADERS)
-            result_response.raise_for_status()
             result_data = result_response.json()
-            print(f"Попытка {attempt + 1}. Ответ API (статус задачи):",
-                  json.dumps(result_data, indent=4, ensure_ascii=False))
+            print("Статус задачи:", result_data)
 
-            status = result_data.get("status")
-            if status == "completed":
-                image_url = result_data.get("output", [])[0]  # Получаем первый URL из списка
+            if result_data["status"] == "success":
+                image_url = result_data["output"]  # URL изображения
                 break
-            elif status == "failed":
-                await update.message.reply_text("Ошибка генерации изображения (статус failed).")
+            elif result_data["status"] == "failed":
+                await update.message.reply_text("Ошибка генерации.")
                 return
         else:
             await update.message.reply_text("Время ожидания истекло.")
             return
 
-        # Скачиваем изображение
+        # 3. Скачиваем и отправляем изображение
         image_response = requests.get(image_url)
-        image_response.raise_for_status()
-        image_data = image_response.content
+        image_data = io.BytesIO(image_response.content)
+        await update.message.reply_photo(photo=InputFile(image_data, filename="image.png"))
 
-        # Отправляем изображение пользователю
-        await update.message.reply_photo(photo=InputFile(io.BytesIO(image_data), filename="image.png"))
-
-    except requests.exceptions.HTTPError as e:
-        # Обработка ошибок HTTP
-        error_message = f"HTTP ошибка: {e.response.status_code} - {e.response.text}"
-        print(error_message)
-        await update.message.reply_text(f"Ошибка: {error_message}")
     except Exception as e:
-        # Обработка других ошибок
-        await update.message.reply_text(f"Произошла ошибка: {str(e)}")
+        await update.message.reply_text(f"Ошибка: {str(e)}")
 
 if __name__ == "__main__":
-    # Создаем и запускаем приложение
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_image))
