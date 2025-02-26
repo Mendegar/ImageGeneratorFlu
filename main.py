@@ -1,8 +1,8 @@
 import os
-import asyncio
 import io
 import json
-import aiohttp
+import requests
+import asyncio
 from telegram import Update, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -57,52 +57,51 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            # Отправка запроса на создание задачи
-            async with session.post(API_URL, json=input_data, headers=HEADERS) as resp:
-                resp.raise_for_status()
-                task_data = await resp.json()
-                print("Ответ API (создание задачи):", json.dumps(task_data, indent=4, ensure_ascii=False))
+        # Отправка запроса на создание задачи
+        response = requests.post(API_URL, json=input_data, headers=HEADERS)
+        response.raise_for_status()
+        task_data = response.json()
+        print("Ответ API (создание задачи):", json.dumps(task_data, indent=4, ensure_ascii=False))
 
-                # Получаем request_id из ответа
-                request_id = task_data.get("request_id")
-                if not request_id:
-                    await update.message.reply_text("Ошибка: не удалось получить request_id.")
-                    return
+        # Получаем request_id из ответа
+        request_id = task_data.get("request_id")
+        if not request_id:
+            await update.message.reply_text("Ошибка: не удалось получить request_id.")
+            return
 
-                await update.message.reply_text("Генерация изображения началась. Ожидайте...")
+        await update.message.reply_text("Генерация изображения началась. Ожидайте...")
 
-            # Ожидание завершения задачи
-            result_url = f"https://api.gen-api.ru/api/v1/requests/{request_id}"
-            image_url = None
+        # Ожидание завершения задачи
+        result_url = f"https://api.gen-api.ru/api/v1/requests/{request_id}"
+        image_url = None
 
-            # Проверяем статус задачи несколько раз с интервалом
-            for attempt in range(10):  # 10 попыток с интервалом 15 секунд
-                await asyncio.sleep(15)
-                async with session.get(result_url, headers=HEADERS) as result_resp:
-                    result_resp.raise_for_status()
-                    result_data = await result_resp.json()
-                    print(f"Попытка {attempt + 1}. Ответ API (статус задачи):",
-                          json.dumps(result_data, indent=4, ensure_ascii=False))
+        # Проверяем статус задачи несколько раз с интервалом
+        for attempt in range(10):  # 10 попыток с интервалом 15 секунд
+            await asyncio.sleep(15)
+            result_response = requests.get(result_url, headers=HEADERS)
+            result_response.raise_for_status()
+            result_data = result_response.json()
+            print(f"Попытка {attempt + 1}. Ответ API (статус задачи):",
+                  json.dumps(result_data, indent=4, ensure_ascii=False))
 
-                    status = result_data.get("status")
-                    if status == "completed":
-                        image_url = result_data.get("output", [])[0]  # Получаем первый URL из списка
-                        break
-                    elif status == "failed":
-                        await update.message.reply_text("Ошибка генерации изображения (статус failed).")
-                        return
-            else:
-                await update.message.reply_text("Время ожидания истекло.")
+            status = result_data.get("status")
+            if status == "completed":
+                image_url = result_data.get("output", [])[0]  # Получаем первый URL из списка
+                break
+            elif status == "failed":
+                await update.message.reply_text("Ошибка генерации изображения (статус failed).")
                 return
+        else:
+            await update.message.reply_text("Время ожидания истекло.")
+            return
 
-            # Скачиваем изображение
-            async with session.get(image_url) as img_resp:
-                img_resp.raise_for_status()
-                image_data = await img_resp.read()
+        # Скачиваем изображение
+        image_response = requests.get(image_url)
+        image_response.raise_for_status()
+        image_data = image_response.content
 
-            # Отправляем изображение пользователю
-            await update.message.reply_photo(photo=InputFile(io.BytesIO(image_data), filename="image.png"))
+        # Отправляем изображение пользователю
+        await update.message.reply_photo(photo=InputFile(io.BytesIO(image_data), filename="image.png"))
 
     except Exception as e:
         await update.message.reply_text(f"Произошла ошибка: {str(e)}")
