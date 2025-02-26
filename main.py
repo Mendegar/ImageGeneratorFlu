@@ -4,8 +4,8 @@ from telegram import Update, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Конфигурация
-TELEGRAM_TOKEN = os.getenv("7201915918:AAHNjGxFZf05Cf_pgxzmtQzyFTL7nH0YH38")
-FLUX_API_KEY = os.getenv("sk-rNa82Rjfnn1sEDPIklRpicIKxH7mOWmxwFK7q434hUn8vsCoKTDM1LULDw9f")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+FLUX_API_KEY = os.getenv("FLUX_API_KEY")  
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Отправь мне текстовый промпт, и я сгенерирую изображение через Flux.ai.")
