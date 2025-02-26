@@ -22,7 +22,7 @@ HEADERS = {
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start."""
     await update.message.reply_text(
-        "Привет! Отправь мне текстовый промпт, и я сгенерирую изображение через Flux.ai."
+        "Пришлите промт текстом"
     )
 
 async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
