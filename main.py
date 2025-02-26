@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # Конфигурация
 TELEGRAM_TOKEN = os.getenv("7201915918:AAHNjGxFZf05Cf_pgxzmtQzyFTL7nH0YH38")
-FLUX_API_KEY = os.getenv("api_key = sk-rNa82Rjfnn1sEDPIklRpicIKxH7mOWmxwFK7q434hUn8vsCoKTDM1LULDw9f")
+FLUX_API_KEY = os.getenv("sk-rNa82Rjfnn1sEDPIklRpicIKxH7mOWmxwFK7q434hUn8vsCoKTDM1LULDw9f")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Отправь мне текстовый промпт, и я сгенерирую изображение через Flux.ai.")
