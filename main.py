@@ -1,17 +1,17 @@
 import os
 import requests
-import time
+import asyncio
+import io
 from telegram import Update, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Конфигурация
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Токен Telegram-бота
-FLUX_API_KEY = os.getenv("FLUX_API_KEY")      # API-ключ Flux.ai
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+FLUX_API_KEY = os.getenv("FLUX_API_KEY")
 
 # URL API
 API_URL = "https://api.gen-api.ru/api/v1/networks/flux"
 
-# Заголовки для запросов
 HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -19,28 +19,14 @@ HEADERS = {
 }
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start."""
-    await update.message.reply_text(
-        "Привет! Отправь мне текстовый промпт, и я сгенерирую изображение через Flux.ai."
-    )
+    await update.message.reply_text("Привет! Отправь мне текст, и я сгенерирую изображение через Flux.ai.")
 
 async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик генерации изображения."""
     prompt = update.message.text
 
-    # Параметры для генерации
     input_data = {
-        "translate_input": True,
-        "prompt": prompt,
-        "model": "Realism",
-        "width": "2048",
-        "height": "2048",
-        "num_inference_steps": 28,
-        "guidance_scale": 5,
-        "num_images": 1,
-        "enable_safety_checker": False,
-        "strength": 1,
-        "is_sync": False
+        "callback_url": None,
+        "prompt": prompt
     }
 
     try:
@@ -49,16 +35,16 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response.raise_for_status()
         task_data = response.json()
 
-        # Получение request_id
         request_id = task_data.get("request_id")
         if not request_id:
-            raise ValueError("Не удалось получить request_id из ответа API")
+            raise ValueError("Не удалось получить request_id")
 
-        # Ожидание завершения задачи
         await update.message.reply_text("Генерация изображения началась. Ожидайте...")
         result_url = f"{API_URL}/{request_id}"
+
+        # Ожидание результата
         while True:
-            time.sleep(10)  # Ожидание 10 секунд перед проверкой статуса
+            await asyncio.sleep(10)
             result_response = requests.get(result_url, headers=HEADERS)
             result_response.raise_for_status()
             result_data = result_response.json()
@@ -66,27 +52,28 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result_data.get("status") == "success":
                 output = result_data.get("output")
                 if not output:
-                    raise ValueError("Ключ 'output' отсутствует в ответе API")
+                    raise ValueError("Ошибка: пустой output")
                 break
             elif result_data.get("status") == "failed":
                 raise ValueError("Ошибка генерации изображения")
 
-        # Скачивание изображения
-        image_data = requests.get(output).content
+        # Проверка типа output (может быть список или строка)
+        if isinstance(output, list):
+            image_url = output[0]
+        else:
+            image_url = output
 
-        # Отправка изображения в Telegram
+        image_data = requests.get(image_url).content
+
         await update.message.reply_photo(photo=InputFile(io.BytesIO(image_data), filename="image.png"))
 
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {str(e)}")
 
 if __name__ == "__main__":
-    # Инициализация бота
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Обработчики команд
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_image))
 
-    # Запуск бота
     app.run_polling()
