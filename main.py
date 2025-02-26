@@ -19,13 +19,13 @@ HEADERS = {
 
 # Модель и параметры по умолчанию
 DEFAULT_MODEL = "Realism"  # Модель для генерации изображений
-DEFAULT_WIDTH = 1280
-DEFAULT_HEIGHT = 1280
-DEFAULT_NUM_IMAGES = 1
-DEFAULT_NUM_INFERENCE_STEPS = 28
-DEFAULT_GUIDANCE_SCALE = 5
-DEFAULT_STRENGTH = 1
-DEFAULT_SAFETY_CHECKER = False
+DEFAULT_WIDTH = 1280  # Ширина изображения
+DEFAULT_HEIGHT = 1280  # Высота изображения
+DEFAULT_NUM_IMAGES = 1  # Количество изображений
+DEFAULT_NUM_INFERENCE_STEPS = 28  # Количество шагов генерации
+DEFAULT_GUIDANCE_SCALE = 5  # Параметр guidance_scale
+DEFAULT_STRENGTH = 1  # Параметр strength
+DEFAULT_SAFETY_CHECKER = False  # Отключение проверки безопасности
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start."""
@@ -59,7 +59,7 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Отправка запроса на создание задачи
         response = requests.post(API_URL, json=input_data, headers=HEADERS)
-        response.raise_for_status()
+        response.raise_for_status()  # Проверяем статус ответа
         task_data = response.json()
         print("Ответ API (создание задачи):", json.dumps(task_data, indent=4, ensure_ascii=False))
 
@@ -103,7 +103,13 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Отправляем изображение пользователю
         await update.message.reply_photo(photo=InputFile(io.BytesIO(image_data), filename="image.png"))
 
+    except requests.exceptions.HTTPError as e:
+        # Обработка ошибок HTTP
+        error_message = f"HTTP ошибка: {e.response.status_code} - {e.response.text}"
+        print(error_message)
+        await update.message.reply_text(f"Ошибка: {error_message}")
     except Exception as e:
+        # Обработка других ошибок
         await update.message.reply_text(f"Произошла ошибка: {str(e)}")
 
 if __name__ == "__main__":
