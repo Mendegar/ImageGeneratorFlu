@@ -10,7 +10,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Токен Telegram-бота
 FLUX_API_KEY = os.getenv("FLUX_API_KEY")      # API-ключ Flux.ai
 
 # URL API
-API_URL = "https://api.gen-api.ru/api/v1/request/get/{request_id}"
+API_URL = "https://api.gen-api.ru/api/v1/networks/flux"
 
 # Заголовки для запросов
 HEADERS = {
@@ -57,9 +57,9 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Ожидание завершения задачи
         await update.message.reply_text("Генерация изображения началась. Ожидайте...")
-        result_url = f"{API_URL}/{request_id}"
+        result_url = f"https://api.gen-api.ru/api/v1/request/get/{request_id}"
         while True:
-            time.sleep(10)  # Ожидание 10 секунд перед проверкой статуса
+            time.sleep(20)  # Ожидание 10 секунд перед проверкой статуса
             result_response = requests.get(result_url, headers=HEADERS)
             result_response.raise_for_status()
             result_data = result_response.json()
