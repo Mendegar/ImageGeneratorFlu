@@ -10,7 +10,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Токен Telegram-бота
 FLUX_API_KEY = os.getenv("FLUX_API_KEY")      # API-ключ Flux.ai
 
 # URL API
-API_URL = "https://api.gen-api.ru/api/v1/networks/flux"
+API_URL = "https://api.gen-api.ru/api/v1/request/get/{request_id}"
 
 # Заголовки для запросов
 HEADERS = {
